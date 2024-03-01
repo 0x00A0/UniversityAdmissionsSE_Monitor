@@ -4,6 +4,7 @@ import platform
 from time import sleep
 
 import requests
+from plyer import notification
 import logging
 import colorlog
 from bs4 import BeautifulSoup
@@ -123,5 +124,11 @@ if __name__ == '__main__':
 				logger.info(course_name)
 				logger.info("\t"+course_uni)
 				logger.info("\t"+course_status)
+				notification.notify(
+						title='STATUS CHANGED!!!',
+						message=course_status+", "+course_name+" | "+course_uni,
+						app_icon=None,
+						timeout=300,
+				)
 				application_status[i] = course_status
 		sleep(900)
