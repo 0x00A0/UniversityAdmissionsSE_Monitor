@@ -1,0 +1,12 @@
+{
+  "username": "lihua@outlook.com",
+  "password": "abcd",
+  "smtp": {
+    "host": "smtp.resend.com",
+    "port": 587,
+    "username": "resend",
+    "token": "1234",
+    "from": "from@where.com",
+    "to": "your@mail.com"
+  }
+}
