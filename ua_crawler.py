@@ -98,7 +98,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--interval",
-    help="Interval between checks",
+    help="Interval between checks, defaults to 300 seconds",
     type=int,
     default=300,
     required=False,
