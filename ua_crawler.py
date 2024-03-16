@@ -3,6 +3,11 @@ import random
 import platform
 import argparse
 from time import sleep
+import smtplib
+from email.message import EmailMessage
+import queue
+import json
+import threading
 
 import requests
 from plyer import notification
@@ -87,27 +92,124 @@ if not logger.handlers:
 
 parser = argparse.ArgumentParser(description="University Admissions Crawler")
 parser.add_argument(
-    "-u",
-    "--username",
-    type=str,
-    help="Username for universityadmissions.se",
-    required=True,
+    "--mail",
+    help="Notify via email if status changes",
+    action="store_true",
 )
 parser.add_argument(
-    "-p",
-    "--password",
-    type=str,
-    help="Password for universityadmissions.se",
-    required=True,
-)
-parser.add_argument(
-    "-i",
     "--interval",
+    help="Interval between checks",
     type=int,
-    help="Refresh interval in seconds",
     default=300,
     required=False,
+    metavar="SECONDS",
 )
+
+
+class Config:
+    def __init__(self, mail_mode):
+        try:
+            self.__config = json.load(open("./config.local.json", "r"))
+            logger.info("Using local config file")
+        except FileNotFoundError:
+            self.__config = json.load(open("./config.json", "r"))
+        try:
+            assert "username" in self.__config
+            self.__str_check(self.__config["username"])
+            assert "password" in self.__config
+            self.__str_check(self.__config["password"])
+            if mail_mode:
+                assert "smtp" in self.__config
+                assert "host" in self.__config["smtp"]
+                self.__str_check(self.__config["smtp"]["host"])
+                assert "port" in self.__config["smtp"]
+                self.__int_check(self.__config["smtp"]["port"])
+                assert "username" in self.__config["smtp"]
+                self.__str_check(self.__config["smtp"]["username"])
+                assert "token" in self.__config["smtp"]
+                self.__str_check(self.__config["smtp"]["token"])
+                assert "from" in self.__config["smtp"]
+                self.__str_check(self.__config["smtp"]["from"])
+                assert "to" in self.__config["smtp"]
+                self.__str_check(self.__config["smtp"]["to"])
+        except AssertionError:
+            logger.error(f"Invalid config file, {self.__config}")
+            exit(1)
+
+    def __str_check(self, value):
+        assert isinstance(value, str) and bool(value) is True
+
+    def __int_check(self, value):
+        assert isinstance(value, int)
+
+    @property
+    def username(self):
+        return self.__config["username"]
+
+    @property
+    def password(self):
+        return self.__config["password"]
+
+    @property
+    def smtp(self):
+        return self.__config["smtp"]
+
+
+class DesktopNotifier:
+    def __init__(self):
+        self.__system = platform.system()
+        if self.__system == "Darwin":
+            self.__title_part = 'with title "UA Crawler"'
+            self.__subtitle_part = 'subtitle "STATUS CHANGED!!!"'
+            self.__sound_part = 'sound name "Glass"'
+
+    def send(self, message):
+        if platform.system() == "Darwin":
+            applescript = f'display notification "{message}" {self.__title_part} {self.__subtitle_part} {self.__sound_part}'
+            os.system(f"osascript -e '{applescript}'")
+            return
+        try:
+            assert notification.notify is not None
+            notification.notify(
+                title="STATUS CHANGED!!!",
+                message=message,
+                app_icon=None,
+                timeout=300,
+            )
+        except Exception:
+            logger.error("Desktop notification failed")
+
+
+class MailNotifier:
+    def __init__(self, config):
+        self.__config = config
+        try:
+            self.__server = smtplib.SMTP_SSL(
+                self.__config["host"], self.__config["port"]
+            )
+            self.__server.login(self.__config["username"], self.__config["token"])
+        except Exception:
+            logger.error("SMTP login failed")
+            exit(1)
+
+    def send(self, message):
+        content = EmailMessage()
+        content.set_content(message)
+        content["Subject"] = "University Admissions Status Changed"
+        content["From"] = self.__config["from"]
+        content["To"] = self.__config["to"]
+        try:
+            self.__server.sendmail(
+                self.__config["from"], self.__config["to"], content.as_string()
+            )
+        except Exception:
+            logger.error("SMTP send failed")
+
+    def __del__(self):
+        try:
+            self.__server.quit()
+        except Exception:
+            pass
 
 
 def clear():
@@ -118,16 +220,13 @@ def clear():
         os.system("clear")
 
 
-if __name__ == "__main__":
-    # clear()
-    args = parser.parse_args()
+def producer(q, username, password, interval):
     params = {
-        "username": args.username,
-        "password": args.password,
+        "username": username,
+        "password": password,
         "url": "/intl/mypages",
     }
-
-    application_status = ["", "", "", ""]
+    application_info = {}
     while 42:
         response = s.post(
             "https://www.universityadmissions.se/intl/loginajax",
@@ -154,29 +253,58 @@ if __name__ == "__main__":
         if soup.head.title.text != "My applications - Universityadmissions.se":
             continue
         courses = soup.find_all("div", class_="course")
-        for i, course in enumerate(courses):
+        for course in courses:
             course_name = course.find(
                 "h3", class_="coursehead_desktop heading4 coursename moreinfolink"
-            ).text.strip()
+            ).text.strip()[2:]
             course_uni = (
                 course.find("span", class_="appl_fontsmall").text.split(",")[1].strip()
             )
             course_status = course.find("div", class_="statusblock").text.strip()
-            if application_status[i] != course_status:
-                if application_status[i] != "":
+            try:
+                if application_info[course_name]["status"] != course_status:
                     logger.warning("STATUS CHANGED!!!")
+                    msg = course_status + ", " + course_name + " | " + course_uni
+                    q.put(msg)
+            except KeyError:
+                application_info[course_name] = {}
+            finally:
                 logger.info(course_name)
                 logger.info("\t" + course_uni)
                 for course_status_lines in course_status.split("\n"):
                     logger.info("\t" + course_status_lines)
                 print()
-                if notification.notify is None:
-                    continue
-                notification.notify(
-                    title="STATUS CHANGED!!!",
-                    message=course_status + ", " + course_name + " | " + course_uni,
-                    app_icon=None,
-                    timeout=300,
-                )
-                application_status[i] = course_status
-        sleep(args.interval)
+                application_info[course_name]["status"] = course_status
+                application_info[course_name]["uni"] = course_uni
+        sleep(interval)
+
+
+def consumer(q, notifier):
+    while 42:
+        message = q.get()
+        notifier.send(message)
+        sleep(10)
+
+
+if __name__ == "__main__":
+    # clear()
+    args = parser.parse_args()
+    config = Config(args.mail)
+    if args.mail:
+        logger.info("Mail Notifier Enabled")
+        notifier = MailNotifier(config.smtp)
+    else:
+        notifier = DesktopNotifier()
+    q = queue.Queue(20)
+
+    pt = threading.Thread(
+        target=producer,
+        args=(q, config.username, config.password, args.interval),
+        daemon=True,
+    )
+    ct = threading.Thread(target=consumer, args=(q, notifier), daemon=True)
+
+    pt.start()
+    ct.start()
+    pt.join()
+    ct.join()
