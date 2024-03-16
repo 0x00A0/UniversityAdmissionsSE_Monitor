@@ -109,32 +109,47 @@ parser.add_argument(
 class Config:
     def __init__(self, mail_mode):
         try:
-            self.__config = json.load(open("./config.local.json", "r"))
-            logger.info("Using local config file")
-        except FileNotFoundError:
-            self.__config = json.load(open("./config.json", "r"))
-        try:
-            assert "username" in self.__config
-            self.__str_check(self.__config["username"])
-            assert "password" in self.__config
-            self.__str_check(self.__config["password"])
-            if mail_mode:
-                assert "smtp" in self.__config
-                assert "host" in self.__config["smtp"]
-                self.__str_check(self.__config["smtp"]["host"])
-                assert "port" in self.__config["smtp"]
-                self.__int_check(self.__config["smtp"]["port"])
-                assert "username" in self.__config["smtp"]
-                self.__str_check(self.__config["smtp"]["username"])
-                assert "token" in self.__config["smtp"]
-                self.__str_check(self.__config["smtp"]["token"])
-                assert "from" in self.__config["smtp"]
-                self.__str_check(self.__config["smtp"]["from"])
-                assert "to" in self.__config["smtp"]
-                self.__str_check(self.__config["smtp"]["to"])
-        except AssertionError:
-            logger.error(f"Invalid config file, {self.__config}")
-            exit(1)
+            self.__config = {
+                "username": os.environ["UA_USERNAME"],
+                "password": os.environ["UA_PASSWORD"],
+                "smtp": {
+                    "host": os.environ["SMTP_HOST"],
+                    "port": int(os.environ["SMTP_PORT"]),
+                    "username": os.environ["SMTP_USERNAME"],
+                    "token": os.environ["SMTP_TOKEN"],
+                    "from": os.environ["SMTP_FROM"],
+                    "to": os.environ["SMTP_TO"],
+                },
+            }
+            logger.info("Using environment variables")
+        except KeyError:
+            try:
+                self.__config = json.load(open("./config.local.json", "r"))
+                logger.info("Using local config file")
+            except FileNotFoundError:
+                self.__config = json.load(open("./config.json", "r"))
+            try:
+                assert "username" in self.__config
+                self.__str_check(self.__config["username"])
+                assert "password" in self.__config
+                self.__str_check(self.__config["password"])
+                if mail_mode:
+                    assert "smtp" in self.__config
+                    assert "host" in self.__config["smtp"]
+                    self.__str_check(self.__config["smtp"]["host"])
+                    assert "port" in self.__config["smtp"]
+                    self.__int_check(self.__config["smtp"]["port"])
+                    assert "username" in self.__config["smtp"]
+                    self.__str_check(self.__config["smtp"]["username"])
+                    assert "token" in self.__config["smtp"]
+                    self.__str_check(self.__config["smtp"]["token"])
+                    assert "from" in self.__config["smtp"]
+                    self.__str_check(self.__config["smtp"]["from"])
+                    assert "to" in self.__config["smtp"]
+                    self.__str_check(self.__config["smtp"]["to"])
+            except AssertionError:
+                logger.error(f"Invalid config file, {self.__config}")
+                exit(1)
 
     def __str_check(self, value):
         assert isinstance(value, str) and bool(value) is True
