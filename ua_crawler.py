@@ -91,12 +91,10 @@ def clear():
 		os.system('clear')
 
 if __name__ == '__main__':
-	username=input("Email or Swedish identity number:\n")
-	password=input("password:\n")
-	clear()
+	#clear()
 	params = {
-		'username': username,
-		'password': password,
+		'username': "",
+		'password': "",
 		'url': '/intl/mypages'
 	}
 
@@ -123,7 +121,9 @@ if __name__ == '__main__':
 					logger.warning("STATUS CHANGED!!!")
 				logger.info(course_name)
 				logger.info("\t"+course_uni)
-				logger.info("\t"+course_status)
+				for course_status_lines in course_status.split('\n'):
+					logger.info("\t"+course_status_lines)
+				print()
 				notification.notify(
 						title='STATUS CHANGED!!!',
 						message=course_status+", "+course_name+" | "+course_uni,
@@ -131,4 +131,4 @@ if __name__ == '__main__':
 						timeout=300,
 				)
 				application_status[i] = course_status
-		sleep(900)
+		sleep(300)
