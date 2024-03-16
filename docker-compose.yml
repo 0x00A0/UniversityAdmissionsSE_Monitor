@@ -1,0 +1,16 @@
+version: "3.3"
+
+services:
+  app:
+    container_name: ua_crawler
+    build: .
+    restart: unless-stopped
+    environment:
+      UA_USERNAME: "lihua@outlook.com"
+      UA_PASSWORD: "abcd"
+      SMTP_HOST: "smtp.resend.com"
+      SMTP_PORT: "465"
+      SMTP_USERNAME: "resend"
+      SMTP_TOKEN: "1234"
+      SMTP_FROM: "from@where.com"
+      SMTP_TO: "your@address.com"
