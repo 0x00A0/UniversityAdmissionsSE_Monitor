@@ -12,7 +12,7 @@ University Admissions Crawler
 options:
   -h, --help          show this help message and exit
   --mail              Notify via email if status changes
-  --interval SECONDS  IInterval between checks, defaults to 300 seconds
+  --interval SECONDS  Interval between checks, defaults to 300 seconds
 ```
 
 ### Desktop mode
