@@ -199,24 +199,27 @@ class MailNotifier:
     def __init__(self, config):
         self.__config = config
         try:
-            self.__server = smtplib.SMTP_SSL(
-                self.__config["host"], self.__config["port"]
+            self.__server = smtplib.SMTP(
+                self.__config["host"], self.__config["port"], timeout=30
             )
+            self.__server.starttls()
             self.__server.login(self.__config["username"], self.__config["token"])
-        except Exception:
+        except Exception as e:
             logger.error("SMTP login failed")
+            logger.error(e)
             exit(1)
 
     def send(self, message):
         content = EmailMessage()
         content.set_content(message)
-        content["Subject"] = "University Admissions Status Changed"
+        content["Subject"] = "University Admissions Monitor"
         content["From"] = self.__config["from"]
         content["To"] = self.__config["to"]
         try:
             self.__server.sendmail(
                 self.__config["from"], self.__config["to"], content.as_string()
             )
+            logger.info("SMTP sent successed")
         except Exception:
             logger.error("SMTP send failed")
 
@@ -268,6 +271,7 @@ def producer(q, username, password, interval):
         if soup.head.title.text != "My applications - Universityadmissions.se":
             continue
         courses = soup.find_all("div", class_="course")
+        q.put("STARTED MONITORING... \nTEST MAIL")
         for course in courses:
             course_name = course.find(
                 "h3", class_="coursehead_desktop heading4 coursename moreinfolink"
