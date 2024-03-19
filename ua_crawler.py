@@ -245,6 +245,7 @@ def producer(q, username, password, interval):
         "url": "/intl/mypages",
     }
     application_info = {}
+    q.put("STARTED MONITORING... \nTEST MAIL")
     while 42:
         response = s.post(
             "https://www.universityadmissions.se/intl/loginajax",
@@ -271,7 +272,6 @@ def producer(q, username, password, interval):
         if soup.head.title.text != "My applications - Universityadmissions.se":
             continue
         courses = soup.find_all("div", class_="course")
-        q.put("STARTED MONITORING... \nTEST MAIL")
         for course in courses:
             course_name = course.find(
                 "h3", class_="coursehead_desktop heading4 coursename moreinfolink"
